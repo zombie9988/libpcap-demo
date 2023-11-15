@@ -38,7 +38,7 @@ int main(int, char **)
     if (pcap_init(PCAP_CHAR_ENC_UTF_8, ERR_BUF) != 0)
     {
         log_e(ERR_BUF);
-        return -;
+        return -1;
     }
 
     pcap_if_t *device_list;
