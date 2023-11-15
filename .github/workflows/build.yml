@@ -20,4 +20,5 @@ jobs:
         run: ls -R
       - uses: actions/upload-artifact@v3
         with:
-          name: build/libpcap-demo
+          name: libpcap-demo executable
+          path: build/libpcap-demo
