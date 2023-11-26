@@ -3,5 +3,5 @@
 Для сборки проекта необходимо установить библиотеки
 
 ```bash
-libpcap-dev libsystemd-dev
+libpcap-dev libsystemd-dev libyara-dev
 ```

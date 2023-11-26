@@ -3,20 +3,28 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "ip.h"
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define JOURNALD_LOGGING
+#include "include/ip.h"
+#include "include/errors.h"
+
+#include "src/detector/detector.hpp"
+#include "src/console_sender/console_sender.hpp"
+
+//#define JOURNALD_LOGGING
 
 #ifndef JOURNALD_LOGGING
 extern "C"
 {
-#include "log.c/log.h"
+    #include "src/log.c/log.h"
 }
 
-#define log_t(...) log_trace(__LINE__, __VA_ARGS__)
-#define log_e(...) log_e(__LINE__, __VA_ARGS__)
-#define log_w(...) log_warning(__LINE__, __VA_ARGS__)
-#define log_i(...) log_info(__LINE__, __VA_ARGS__)
+#define log_t(...) log_trace(__VA_ARGS__)
+#define log_e(...) log_error(__VA_ARGS__)
+#define log_w(...) log_warn(__VA_ARGS__)
+#define log_i(...) log_info(__VA_ARGS__)
+
 #else
 #include <systemd/sd-journal.h>
 
@@ -33,8 +41,13 @@ typedef void (*process_packet)(u_char *user, const struct pcap_pkthdr *h,
 
 void handler(u_char *user, const struct pcap_pkthdr *h,
              const u_char *bytes);
-int main(int, char **)
-{
+int main(int argc, char ** argv)
+{  
+    if (argc != 2) {
+        printf("Usage: libpcap-demo <yara path>\n");
+        return 0;
+    }
+
     if (pcap_init(PCAP_CHAR_ENC_UTF_8, ERR_BUF) != 0)
     {
         log_e(ERR_BUF);
@@ -94,14 +107,33 @@ int main(int, char **)
         return -1;
     }
 
-    pcap_dumper_t *f_dumper = pcap_dump_open(capture, "capture.pcap");
+    log_i("Start detector creation");
+    //pcap_dumper_t *f_dumper = pcap_dump_open(capture, "capture.pcap");
+    FILE* yara_rules = fopen(argv[1], "r");
+
+    if (yara_rules == NULL) {
+        log_e("Cant find rules at %s", argv[1]);
+        return D_ERR_YARA_FILE;
+    }
+    char cwd[PATH_MAX];
+    getcwd(cwd, sizeof(cwd));
+
+    std::string file_path = std::string(argv[1]);
+    std::string dir_path = file_path.substr(0, file_path.find_last_of("\\/"));
+     
+    chdir(dir_path.c_str());
+    ConsoleSender s =  ConsoleSender();
+    Detector d = Detector(&s, yara_rules);
+    chdir(cwd);
+
+    log_i("Main loop started");
 
     while (true)
     {
         pcap_pkthdr *p_head;
         const u_char *p_data;
 
-        pcap_dispatch(capture, 1, (process_packet)handler, (u_char *)f_dumper);
+        pcap_dispatch(capture, 1, (process_packet)handler, (u_char *)&d);
     }
 }
 
@@ -109,7 +141,8 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
              const u_char *packet)
 {
     /* ethernet headers are always exactly 14 bytes */
-    pcap_dump(user, h, packet);
+    //pcap_dump(user, h, packet);
+    Detector* d = (Detector*)user;
     const struct sniff_ethernet *ethernet; /* The ethernet header */
     const struct sniff_ip *ip;             /* The IP header */
     const struct sniff_tcp *tcp;           /* The TCP header */
@@ -122,7 +155,7 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
 
     if (ethernet->ether_type != IP_TYPE)
     {
-        log_w("Only IP packets can be handled 0x%08x\n", ethernet->ether_type);
+        //log_w("Only IP packets can be handled 0x%08x\n", ethernet->ether_type);
         return;
     }
 
@@ -131,7 +164,7 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
 
     if (size_ip < 20)
     {
-        log_w("* Invalid IP header length: %u bytes\n", size_ip);
+        //log_w("* Invalid IP header length: %u bytes\n", size_ip);
         return;
     }
 
@@ -140,7 +173,7 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
 
     if (size_tcp < 20)
     {
-        log_w("   * Invalid TCP header length: %u bytes\n", size_tcp);
+        //log_w("   * Invalid TCP header length: %u bytes\n", size_tcp);
         return;
     }
 
@@ -150,8 +183,11 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
     inet_ntop(AF_INET, &(ip->ip_src), src_str, INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &(ip->ip_dst), dst_str, INET_ADDRSTRLEN);
 
-    if (!((strcmp(src_str, "192.168.203.1") == 0) || (strcmp(dst_str, "192.168.203.1") == 0)))
-    {
-        log_i("Packet captured From: %s To: %s", src_str, dst_str);
-    }
+    //if (!((strcmp(src_str, "192.168.203.1") == 0) || (strcmp(dst_str, "192.168.203.1") == 0)))
+    //{
+    //    log_i("Packet captured From: %s To: %s", src_str, dst_str);
+    //}
+
+    d->check_tcp_payload(payload, h->len - (SIZE_ETHERNET + size_ip + size_tcp));
+    
 }
