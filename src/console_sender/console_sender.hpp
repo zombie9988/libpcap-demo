@@ -7,5 +7,5 @@
 class ConsoleSender : public Sender
 {
 public:
-    int send_alert(std::string status);
+    virtual int send_alert(std::string &s_ip, std::string &d_ip, std::string &rule_name);
 };

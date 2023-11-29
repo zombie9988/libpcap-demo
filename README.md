@@ -3,7 +3,7 @@
 Для сборки проекта необходимо установить библиотеки
 
 ```bash
-libpcap-dev libsystemd-dev libyara-dev libpcap-dev
+libpcap-dev libsystemd-dev libyara-dev libpcap-dev libgrpc-dev
 ```
 
 ### Пример использования

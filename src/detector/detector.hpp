@@ -15,6 +15,8 @@ enum D_ERROR
 
 struct tcp_payload
 {
+    std::string s_ip;
+    std::string d_ip;
     const u_char *payload;
     size_t len;
 };
@@ -38,5 +40,5 @@ public:
 
     ~Detector();
 
-    D_ERROR check_tcp_payload(const u_char *payload, size_t len);
+    D_ERROR check_tcp_payload(const u_char *payload, size_t len, std::string s_ip, std::string d_ip);
 };

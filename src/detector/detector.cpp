@@ -7,6 +7,12 @@ extern "C"
 #include "../log.c/log.h"
 }
 
+struct YaraParams {
+    Sender* s;
+    std::string d_ip;
+    std::string s_ip;
+};
+
 int yara_callback(YR_SCAN_CONTEXT *context,
                   int message,
                   void *message_data,
@@ -15,10 +21,11 @@ int yara_callback(YR_SCAN_CONTEXT *context,
     if (message == CALLBACK_MSG_RULE_MATCHING)
     {
         //log_info("Process packet in query");
-        Sender* s = (Sender* )user_data;
+        YaraParams* yp = (YaraParams* )user_data;
+        Sender* s = yp->s;
         YR_RULE *r = (YR_RULE *)message_data;
         auto st = std::string("Alert: ") + std::string(r->identifier);
-        s->send_alert(st);
+        s->send_alert(yp->s_ip, yp->d_ip, r->identifier);
         return CALLBACK_ABORT;
     }
 
@@ -47,7 +54,11 @@ void Detector::process_tcp_payload(std::queue<tcp_payload> *q, Sender* s, YR_RUL
         {
             tcp_payload p = q->front();
             q->pop();
-            yr_rules_scan_mem(rules, p.payload, p.len, NULL, yara_callback, s, 100);
+            YaraParams yp;
+            yp.s = s;
+            yp.d_ip = p.d_ip;
+            yp.s_ip = p.s_ip;
+            yr_rules_scan_mem(rules, p.payload, p.len, NULL, yara_callback, &yp, 100);
         }
     }
 }
@@ -105,10 +116,12 @@ Detector::~Detector()
     }
 }
 
-D_ERROR Detector::check_tcp_payload(const u_char *payload, size_t len)
+D_ERROR Detector::check_tcp_payload(const u_char *payload, size_t len, std::string s_ip, std::string d_ip)
 {
     tcp_payload p;
     p.len = len;
     p.payload = payload;
+    p.s_ip = s_ip;
+    p.d_ip = d_ip;
     _q.push(p);
 }

@@ -6,11 +6,16 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <grpcpp/grpcpp.h>
+#include "src/grpc_sender/grpc_sender.h"
+
 #include "include/ip.h"
 #include "include/errors.h"
 
 #include "src/detector/detector.hpp"
 #include "src/console_sender/console_sender.hpp"
+
+
 
 //#define JOURNALD_LOGGING
 
@@ -122,7 +127,9 @@ int main(int argc, char ** argv)
     std::string dir_path = file_path.substr(0, file_path.find_last_of("\\/"));
      
     chdir(dir_path.c_str());
-    ConsoleSender s =  ConsoleSender();
+    //ConsoleSender s =  ConsoleSender();
+    const auto creds = grpc::InsecureChannelCredentials();
+    GrpcSender s(grpc::CreateChannel("localhost:50051", creds));
     Detector d = Detector(&s, yara_rules);
     chdir(cwd);
 
@@ -188,6 +195,6 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
     //    log_i("Packet captured From: %s To: %s", src_str, dst_str);
     //}
 
-    d->check_tcp_payload(payload, h->len - (SIZE_ETHERNET + size_ip + size_tcp));
+    d->check_tcp_payload(payload, h->len - (SIZE_ETHERNET + size_ip + size_tcp), src_str, dst_str);
     
 }
