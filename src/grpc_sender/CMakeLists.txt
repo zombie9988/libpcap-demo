@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.8)
 
 project(grpc_sender C CXX)
-include(../../common.cmake)
+#include(../../common.cmake)
 # Proto file
 get_filename_component(hw_proto "proto/alert.proto" ABSOLUTE)
 get_filename_component(hw_proto_path "${hw_proto}" PATH)

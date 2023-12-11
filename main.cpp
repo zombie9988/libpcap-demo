@@ -48,8 +48,33 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
              const u_char *bytes);
 int main(int argc, char ** argv)
 {  
-    if (argc != 2) {
-        printf("Usage: libpcap-demo <yara path>\n");
+
+    int opt;
+
+    std::string interface_name;
+    std::string rule_path;
+    std::string grpc_host;
+
+    while ((opt = getopt(argc, argv, "i:r:h:")) != -1) {
+        switch (opt)
+        {
+        case 'i':
+            interface_name = optarg;
+            break;
+        case 'r':
+            rule_path = optarg;
+            break;
+        case 'h':
+            grpc_host = optarg;
+            break;
+
+        default:
+            break;
+        }
+    }
+    
+    if (interface_name.empty() || rule_path.empty() || grpc_host.empty()) {
+        printf("Usage: libpcap-demo -i [interface] -r [yara rule] -h [grpc host]\n");
         return 0;
     }
 
@@ -68,15 +93,15 @@ int main(int argc, char ** argv)
 
     do
     {
-        if (strcmp(device_list->name, "ens33") == 0)
+        if (strcmp(device_list->name, interface_name.c_str()) == 0)
         {
             break;
         }
-    } while (device_list = device_list->next);
+    } while ((device_list = device_list->next));
 
     if (device_list == NULL)
     {
-        log_e("No interface enp1s0");
+        log_e("No interface %s", interface_name.c_str());
         return -1;
     }
 
@@ -114,23 +139,23 @@ int main(int argc, char ** argv)
 
     log_i("Start detector creation");
     //pcap_dumper_t *f_dumper = pcap_dump_open(capture, "capture.pcap");
-    FILE* yara_rules = fopen(argv[1], "r");
+    FILE* yara_rules = fopen(rule_path.c_str(), "r");
 
     if (yara_rules == NULL) {
-        log_e("Cant find rules at %s", argv[1]);
+        log_e("Cant find rules at %s", rule_path.c_str());
         return D_ERR_YARA_FILE;
     }
     char cwd[PATH_MAX];
     getcwd(cwd, sizeof(cwd));
 
-    std::string file_path = std::string(argv[1]);
+    std::string file_path = std::string(rule_path.c_str());
     std::string dir_path = file_path.substr(0, file_path.find_last_of("\\/"));
      
     chdir(dir_path.c_str());
     //ConsoleSender s =  ConsoleSender();
     const auto creds = grpc::InsecureChannelCredentials();
-    GrpcSender s(grpc::CreateChannel("localhost:50051", creds));
-    Detector d = Detector(&s, yara_rules);
+    GrpcSender s(grpc::CreateChannel(grpc_host.c_str(), creds));
+    Detector d(&s, yara_rules);
     chdir(cwd);
 
     log_i("Main loop started");
@@ -194,7 +219,7 @@ void handler(u_char *user, const struct pcap_pkthdr *h,
     //{
     //    log_i("Packet captured From: %s To: %s", src_str, dst_str);
     //}
-
+    //log_i("before Check payload");
     d->check_tcp_payload(payload, h->len - (SIZE_ETHERNET + size_ip + size_tcp), src_str, dst_str);
-    
+    //log_i("after Check payload");
 }

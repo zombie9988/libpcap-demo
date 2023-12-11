@@ -124,4 +124,5 @@ D_ERROR Detector::check_tcp_payload(const u_char *payload, size_t len, std::stri
     p.s_ip = s_ip;
     p.d_ip = d_ip;
     _q.push(p);
+    return D_ERROR::D_ERROR_NO;
 }
